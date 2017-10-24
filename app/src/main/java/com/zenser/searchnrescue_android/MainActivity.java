@@ -4,71 +4,73 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.RequiresApi;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 
-import com.zenser.searchnrescue_android.common.Constants;
-import com.zenser.searchnrescue_android.map.MapLayerFactory;
-
-import org.osmdroid.api.IMapController;
-import org.osmdroid.tileprovider.tilesource.ITileSource;
-import org.osmdroid.views.MapView;
-import org.osmdroid.views.overlay.compass.CompassOverlay;
-import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider;
+import com.zenser.searchnrescue_android.map.MapFragment;
 
 import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
-    private MapView map;
-    private IMapController mapController;
+    private static final String LOG_TAG = "MainActivity";
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestApplicationPermissions();
-        setContentView(R.layout.activity_map);
-        configureMapView();
-    }
-
-
-    private void configureMapView(){
-        setBackgroundMap(MapLayerFactory.KARTVERKET_NORGESKART_TOPO2);
-        getMap().setMultiTouchControls(true);
-        getMapController().setZoom(9);
-        getMapController().setCenter(Constants.GEOPOINT_LILLEHAMMER);
-        getMap().getOverlays().add(getCompassOverlay());
-    }
-
-    private CompassOverlay getCompassOverlay(){
-        CompassOverlay mCompassOverlay = new CompassOverlay(getApplicationContext(), new InternalCompassOrientationProvider(getApplicationContext()), getMap());
-        mCompassOverlay.enableCompass();
-        return mCompassOverlay;
+        setContentView(R.layout.activity_main);
 
     }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 10: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    startFragment(R.id.container_map, MapFragment.newInstance(), getIntent().getExtras());
+                } else {
+                    Log.i(LOG_TAG, "User did not accept all permissions!");
+                    startFragment(R.id.container_map, MapFragment.newInstance(), getIntent().getExtras());
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+                }
+                return;
+            }
+
+            // other 'case' lines to check for other
+            // permissions this app might request
+        }
+    }
+
     /**
-     * Set the active background map in the MapView
-     * @param backgroundMap
+     * Adding a fragment to a transaction fetched from the Support Fragment Manager,
+     * committing the fragment to start it's lifecycle.
+     *
+     * @param viewContainer Reference to a container in the parent activity
+     * @param fragment      Instance that should be inflated in the container
+     * @param bundle        Bundle with arguments to send in to fragment, can be null
      */
-    public void setBackgroundMap(ITileSource backgroundMap){
-        getMap().setTileSource(backgroundMap);
-        getMap().setMaxZoomLevel(backgroundMap.getMaximumZoomLevel());
+    protected void startFragment(int viewContainer, Fragment fragment, Bundle bundle) {
+        FragmentManager fm = getSupportFragmentManager();
+        FragmentTransaction ft = fm.beginTransaction();
+
+        if (null == bundle) {
+            bundle = new Bundle();
+        }
+        fragment.setArguments(bundle);
+
+        ft.replace(viewContainer, fragment);
+        ft.commit();
     }
 
-    public MapView getMap(){
-        if(map == null){
-            map = (MapView) findViewById(R.id.map);
-        }
-        return map;
-    }
-
-    public IMapController getMapController(){
-        if (mapController == null){
-            mapController = map.getController();
-        }
-        return mapController;
-    }
 
 
     public void requestApplicationPermissions() {
@@ -98,7 +100,11 @@ public class MainActivity extends AppCompatActivity {
 
             if (arrayList.size() > 0) {
                 requestPermissions(arrayList.toArray(new String[arrayList.size()]), 10);
+            } else {
+                startFragment(R.id.container_map, MapFragment.newInstance(), getIntent().getExtras());
             }
+        } else {
+            startFragment(R.id.container_map, MapFragment.newInstance(), getIntent().getExtras());
         }
     }
 }

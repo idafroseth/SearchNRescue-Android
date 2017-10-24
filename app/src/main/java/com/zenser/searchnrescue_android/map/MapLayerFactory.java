@@ -8,11 +8,13 @@ import org.osmdroid.tileprovider.MapTileProviderBasic;
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase;
 import org.osmdroid.tileprovider.tilesource.XYTileSource;
 
+/**
+ * MapLayerFactory for different map sources from Kartverket and Geodata and layers.
+ */
 public class MapLayerFactory {
 
     private static final String LOG_TAG = "MapLayerFactory";
 
-    public static final String NONE_TILE_SOURCE_NAME = "NONE";
     public static final String NORGESKART_SOURCE_NAME= "Norgeskart";
     public static final String GEODATA_TILE_SOURCE_NAME = "Geodata "+NORGESKART_SOURCE_NAME;//"GeodataOnlinorne";
     public static final String GEODATA_BILDER_TILE_SOURCE_NAME = "Norge i bilder";
