@@ -276,6 +276,7 @@ public class MapFragment extends Fragment
             case R.id.map_fab_map_menu:
                 Animation animation = AnimationUtils.loadAnimation(getContext(), R.anim.rotate_around_center);
                 v.startAnimation(animation);
+                //@Todo open the menu here
                 break;
 
         }
@@ -288,7 +289,6 @@ public class MapFragment extends Fragment
     private void centerMapToCurrentLocation() {
         if (currentLocation != null ) {
             mMapController.animateTo(new GeoPoint(currentLocation.getLatitude(), currentLocation.getLongitude()));
-            //@Todo show a menu here.
         } else {
             Toaster.showInfo(getContext(), "Søker fortsatt etter GPS..", Toast.LENGTH_SHORT);
         }
