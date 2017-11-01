@@ -1,6 +1,7 @@
 <resources>
-    <string name="app_name">SearchNRescue-Android</string>
+    <string name="app_name">Leteaksjon</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="warning_gps_mock">Lokasjonen er ikke gyldig!</string>
 </resources>

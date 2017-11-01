@@ -1,25 +1,30 @@
 package com.zenser.searchnrescue_android.map;
 
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.drawable.VectorDrawable;
 import android.location.Location;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.res.ResourcesCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import com.zenser.searchnrescue_android.R;
 import com.zenser.searchnrescue_android.common.Constants;
+import com.zenser.searchnrescue_android.geolocation.controller.LocationController;
+import com.zenser.searchnrescue_android.util.ImageUtil;
 import com.zenser.searchnrescue_android.wrapper.Toaster;
 
-import org.osmdroid.api.IGeoPoint;
 import org.osmdroid.api.IMapController;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.events.MapEventsReceiver;
@@ -29,7 +34,6 @@ import org.osmdroid.events.ZoomEvent;
 import org.osmdroid.tileprovider.tilesource.ITileSource;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
-import org.osmdroid.views.overlay.Polyline;
 import org.osmdroid.views.overlay.compass.CompassOverlay;
 import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider;
 import org.osmdroid.views.overlay.mylocation.IMyLocationConsumer;
@@ -37,7 +41,6 @@ import org.osmdroid.views.overlay.mylocation.IMyLocationProvider;
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 
 import java.io.File;
-import java.util.LinkedList;
 
 
 /**
@@ -55,10 +58,14 @@ public class MapFragment extends Fragment
 
     private static final String LOG_TAG = "MapFragment";
 
-    private MapView mMapView;
-    private IMapController mMapController;
     private View mView;
+    private MapView mMapView;
+
+    private IMapController mMapController;
+
     private Location currentLocation;
+    private MyLocationNewOverlay mLocationOverlay;
+    private LocationController mLocationController;
 
     public MapFragment() {
     }
@@ -183,8 +190,8 @@ public class MapFragment extends Fragment
     public void onResume() {
         super.onResume();
         Log.d(LOG_TAG, "onResume");
-        //initLocationOverlay();
-        //initAutomaticLocationUpdates();
+        initLocationOverlay();
+        initAutomaticLocationUpdates();
 
     }
 
@@ -195,8 +202,8 @@ public class MapFragment extends Fragment
     public void onStop() {
         Log.d(LOG_TAG, "onStop");
         super.onStop();
-        //removeMyLocationOverlay();
-        //initLazyUpdates();
+        removeMyLocationOverlay();
+        initLazyUpdates();
 
     }
 
@@ -205,6 +212,10 @@ public class MapFragment extends Fragment
         super.onDetach();
         Log.d(LOG_TAG, "onDetach");
 
+        if (hasExistingLocationOverlay()) {
+            mLocationOverlay.disableMyLocation();
+            mLocationOverlay = null;
+        }
         if (mMapView != null) {
             mMapView.onDetach();
         }
@@ -224,6 +235,115 @@ public class MapFragment extends Fragment
             mView.invalidate();
         }
 
+    }
+
+    /**
+     * Initializing components for user location and set user location to last known location.
+     */
+    private void initAutomaticLocationUpdates() {
+        checkIfLocationIsEnabled();
+        startEagerLocationUpdates();
+
+        if (mLocationOverlay.getMyLocation() != null && isLocationKnown(mLocationOverlay.getMyLocation())) {
+            updateLocation(mLocationOverlay.getMyLocation());
+        } else {
+            updateLocationIfExisting();
+        }
+        mMapView.invalidate();
+    }
+
+    private void checkIfLocationIsEnabled() {
+        if (getCurrentSettingsForLocation() == 0) {
+            Intent onGPS = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(onGPS);
+        }
+    }
+
+
+    private int getCurrentSettingsForLocation() {
+        try {
+            return Settings.Secure.getInt(getActivity().getContentResolver(), Settings.Secure.LOCATION_MODE);
+        } catch (Settings.SettingNotFoundException e) {
+            Log.e(LOG_TAG, "Settings not found when asking for GPS permission: " + e);
+        }
+        return 0;
+    }
+
+    private void initLazyUpdates() {
+        if (getLocationController() != null) {
+            getLocationController().enableLazyUpdates();
+        }
+    }
+
+    private void removeMyLocationOverlay() {
+        if (mLocationOverlay != null) {
+            mLocationOverlay.disableMyLocation();
+            getLocationController().removeLocationConsumer(mLocationOverlay);
+            if (!mMapView.getOverlays().contains(mLocationOverlay)) {
+                mMapView.getOverlays().remove(mLocationOverlay);
+            }
+            mLocationOverlay = null;
+        }
+    }
+
+
+
+    private void startEagerLocationUpdates() {
+        if (getLocationController() != null) {
+            getLocationController().enableEagerUpdates();
+        }
+    }
+
+
+    private void initLocationOverlay() {
+        if (mLocationOverlay == null) {
+
+            mLocationOverlay = new MyLocationNewOverlay(getLocationController(), mMapView);
+            VectorDrawable vector = (VectorDrawable) ResourcesCompat.getDrawable(getContext().getResources(), R.drawable.ic_circle_1_24dp, null);
+            VectorDrawable vectorArrow = (VectorDrawable) ResourcesCompat.getDrawable(getContext().getResources(), R.drawable.ic_navigation_circle_24dp, null);
+            Bitmap mPersonBitmap = ImageUtil.getBitmap(vector);
+            mLocationOverlay.setDirectionArrow(mPersonBitmap, ImageUtil.getBitmap(vectorArrow));
+            mLocationOverlay.setPersonHotspot(mPersonBitmap.getWidth() / 2, mPersonBitmap.getHeight() / 2);
+            mLocationOverlay.enableMyLocation();
+
+            getLocationController().removeLocationConsumer(mLocationOverlay);
+            mMapView.getOverlays().add(mLocationOverlay);
+            updateLocationIfExisting();
+        }
+    }
+
+    private boolean hasExistingLocationOverlay() {
+        return mLocationOverlay != null;
+    }
+
+    private void updateLocationIfExisting() {
+        Location locationFromProvider = getLocationController().getLastKnownLocation();
+        if (currentLocation != null) {
+            registerNewPosition(currentLocation);
+        } else if (locationFromProvider != null) {
+            registerNewPosition(locationFromProvider);
+        }
+    }
+
+    private void updateLocation(GeoPoint lastKnownLocation) {
+        if (lastKnownLocation != null && mMapView != null) {
+            mMapView.getController().animateTo(lastKnownLocation);
+            registerNewPosition(getLocationController().getLastKnownLocation());
+        }
+    }
+
+    private void registerNewPosition(Location location) {
+        if (location != null) {
+            mLocationOverlay.onLocationChanged(location, getLocationController());
+        }
+    }
+
+    public LocationController getLocationController() {
+        if (mLocationController == null) {
+            mLocationController = LocationController.getInstance(getContext());
+            mLocationController.addLocationConsumer(this);
+        }
+        return mLocationController;
     }
 
     /**
@@ -263,6 +383,10 @@ public class MapFragment extends Fragment
         Log.d(LOG_TAG, "onLocationChanged");
 
         if (location != null) {
+            if (mLocationOverlay != null ) {
+
+                mLocationOverlay.onLocationChanged(location, source);
+            }
             currentLocation = location;
         }
     }
@@ -287,11 +411,16 @@ public class MapFragment extends Fragment
      * Method which will zoom the map to the last registered location.
      */
     private void centerMapToCurrentLocation() {
-        if (currentLocation != null ) {
+        GeoPoint currentLocation = mLocationOverlay.getMyLocation();
+        if (currentLocation != null && isLocationKnown(currentLocation)) {
             mMapController.animateTo(new GeoPoint(currentLocation.getLatitude(), currentLocation.getLongitude()));
         } else {
             Toaster.showInfo(getContext(), "Søker fortsatt etter GPS..", Toast.LENGTH_SHORT);
         }
+    }
+
+    private boolean isLocationKnown(GeoPoint currentLocation) {
+        return currentLocation.getLongitude() != 0L && currentLocation.getLatitude() != 0L;
     }
 
 

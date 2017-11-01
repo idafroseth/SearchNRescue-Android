@@ -15,7 +15,7 @@ import com.zenser.searchnrescue_android.map.MapFragment;
 
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity{
 
     private static final String LOG_TAG = "MainActivity";
 
@@ -25,7 +25,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         requestApplicationPermissions();
         setContentView(R.layout.activity_main);
-
     }
 
     @Override
